@@ -1,0 +1,45 @@
+name: Update Docker container on VM
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted # GitHub Runner를 설정해서 self-hosted 기반 서버에서 실행
+    timeout-minutes: 20 # 충분한 시간 제공
+
+    steps:
+      # GitHub 저장소 체크아웃
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Docker Hub 로그인
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      # Docker 이미지 빌드 및 푸시
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: moveho/rolling-paper:latest
+
+      # SSH로 VM 접속 후 Docker 컨테이너 업데이트
+      - name: SSH into VM and update Docker container
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd /home/kevin/rolling-paper # 실행할 스크립트
+            docker-compose down
+            docker-compose pull
+            docker-compose up -d
+        timeout: 1m # SSH 작업 시간 제한
